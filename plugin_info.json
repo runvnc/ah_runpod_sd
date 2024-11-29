@@ -1,0 +1,6 @@
+{
+  "name": "RunPod SD",
+  "version": "1.0.0",
+  "description": "Stable Diffusion via RunPod serverless",
+  "services": []
+}

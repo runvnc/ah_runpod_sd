@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ah_runpod_sd"
+version = "1.0.0"
+description = "Text-to-image with Runpod"
+requires-python = ">=3.7"
+dependencies = ["Pillow", "PyMuPDF", "opencv-python", "numpy"]
+
+
+[project.optional-dependencies]
+dev = ["runpod", "nanoid", "asyncio", "aiohttp"]
