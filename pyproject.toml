@@ -7,8 +7,5 @@ name = "ah_runpod_sd"
 version = "1.0.0"
 description = "Text-to-image with Runpod"
 requires-python = ">=3.7"
-dependencies = ["Pillow", "PyMuPDF", "opencv-python", "numpy"]
+dependencies = ["runpod", "nanoid", "asyncio", "aiohttp"]
 
-
-[project.optional-dependencies]
-dev = ["runpod", "nanoid", "asyncio", "aiohttp"]
