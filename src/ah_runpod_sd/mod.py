@@ -7,7 +7,6 @@ from runpod import AsyncioEndpoint, AsyncioJob
 from nanoid import generate
 from lib.providers.services import service
 from lib.providers.commands import command
-from lib.model_selector import select_models
 from PIL import Image
 import base64
 import io
@@ -82,6 +81,18 @@ async def select_image_model(context: Optional[Any] = None, model_id: Optional[s
     )
     return models[0]
 
+async def default_image_model(context):
+    return {
+        'endpoint_id':  os.env.get("RUNPOD_SD_ENDPOINT_ID"),
+        'defaults': {
+            'steps': 25,
+            'cfg': 8.0,
+            'prompt': '',
+            'negative_prompt': 'ugly, old, fat, bizarre, low quality, score_3, score_4'
+        }
+    }
+
+
 @service()
 async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Optional[str] = None,
                        from_huggingface: Optional[str] = None, count: int = 1,
@@ -108,6 +119,7 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
     try:
         if not context or 'model' not in context.data:
             print("Error: No model selected in context")
+            model = await default_image_model(context)
             return None
             
         model = context.data['model']
