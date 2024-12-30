@@ -121,8 +121,8 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
         if not context or 'model' not in context.data:
             print("Error: No model selected in context")
             model = await default_image_model(context)
-            
-        model = context.data['model']
+        else:
+            model = context.data['model']
         endpoint_id = model['endpoint_id']
         
         input_params = {
