@@ -172,7 +172,7 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
 
     except Exception as e:
         trace = traceback.format_exc()
-        print(f"Error in text_to_image: {str(e)} \n {trace}"
+        print(f"Error in text_to_image: {str(e)} \n {trace}")
         return None
 
 @command()
