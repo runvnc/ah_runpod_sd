@@ -1,3 +1,4 @@
+from typing import Optional, Dict, Any, List
 import asyncio
 import aiohttp
 import os
@@ -6,75 +7,113 @@ from runpod import AsyncioEndpoint, AsyncioJob
 from nanoid import generate
 from lib.providers.services import service
 from lib.providers.commands import command
-from lib.providers.hooks import hook
 from lib.model_selector import select_models
-
-# asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # For Windows users.
+from PIL import Image
+import base64
+import io
 
 runpod.api_key = os.getenv("RUNPOD_API_KEY")
 
-def random_img_fname():
+def random_img_fname() -> str:
+    """Generate a random filename for an image with .png extension"""
     return generate() + ".png"
 
+async def send_job(input: Dict[str, Any], endpoint_id: str) -> Optional[Image.Image]:
+    """Send a job to RunPod endpoint and wait for results
 
-async def send_job(input, endpoint_id):
-    async with aiohttp.ClientSession() as session:
-        endpoint = AsyncioEndpoint(endpoint_id, session)
-        job: AsyncioJob = await endpoint.run(input)
+    Args:
+        input: Dictionary of input parameters for the model
+        endpoint_id: RunPod endpoint ID
 
-        while True:
-            status = await job.status()
-            print(f"Current job status: {status}")
-            if status == "COMPLETED":
-                output = await job.output()
-                import base64
-                from PIL import Image
-                import io
+    Returns:
+        PIL Image object or None if job fails
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            endpoint = AsyncioEndpoint(endpoint_id, session)
+            job: AsyncioJob = await endpoint.run(input)
 
-                image_data = output['image_url']
-                if image_data.startswith('data:image/png;base64,'):
-                    image_data = image_data[len('data:image/png;base64,'):]
-                elif image_data.startswith('data:image/jpeg;base64,'):
-                    image_data = image_data[len('data:image/jpeg;base64,'):]
-
-                image_bytes = base64.b64decode(image_data)
-
-                image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-                return image
+            while True:
+                status = await job.status()
+                print(f"Current job status: {status}")
                 
-                break
-            elif status in ["FAILED"]:
-                print("Job failed or encountered an error.")
+                if status == "COMPLETED":
+                    output = await job.output()
+                    image_data = output['image_url']
+                    
+                    # Handle different base64 prefixes
+                    for prefix in ['data:image/png;base64,', 'data:image/jpeg;base64,']:
+                        if image_data.startswith(prefix):
+                            image_data = image_data[len(prefix):]
+                            break
 
-                break
-            else:
-                print("Job in queue or processing..")
+                    image_bytes = base64.b64decode(image_data)
+                    return Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                
+                elif status == "FAILED":
+                    print("Job failed or encountered an error.")
+                    return None
+                
                 await asyncio.sleep(1)
-
-
-#@hook()
-#async def add_instructions(context=None):
-#    return ''
-#    model = await context.select_image_model()
-#    if 'tips' in model:
-#        return model['tips']
+    except Exception as e:
+        print(f"Error in send_job: {str(e)}")
+        return None
 
 @service()
-async def select_image_model(context=None, model_id=None, local=False, uncensored=False):
-    models = await select_models(service_or_command='image', provider='AH Runpod', local=False, model_id=model_id, uncensored=context.uncensored)
+async def select_image_model(context: Optional[Any] = None, model_id: Optional[str] = None, 
+                           local: bool = False, uncensored: bool = False) -> Dict[str, Any]:
+    """Select an appropriate image model based on criteria
+
+    Args:
+        context: Context object containing user preferences
+        model_id: Specific model ID to select
+        local: Whether to use local models only
+        uncensored: Whether to allow uncensored models
+
+    Returns:
+        Dictionary containing model information
+    """
+    models = await select_models(
+        service_or_command='image',
+        provider='AH Runpod',
+        local=False,
+        model_id=model_id,
+        uncensored=context.uncensored if context else False
+    )
     return models[0]
 
 @service()
-async def text_to_image(prompt, negative_prompt='', model_id=None, from_huggingface=None,
-                        count=1, context=None, save_to="imgs/" + random_img_fname(), w=1024, h=1024, steps=20, cfg=8):
-    print("text_to_image. trying to get model")
-    try: 
-        model = context.data['model']
+async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Optional[str] = None,
+                       from_huggingface: Optional[str] = None, count: int = 1,
+                       context: Optional[Any] = None, save_to: Optional[str] = None,
+                       w: int = 1024, h: int = 1024, steps: int = 20, cfg: float = 8.0) -> Optional[str]:
+    """Generate image(s) from text description
 
-        print("model is", model)
+    Args:
+        prompt: Text description of desired image
+        negative_prompt: Things to avoid in the image
+        model_id: Specific model to use
+        from_huggingface: HuggingFace model ID
+        count: Number of images to generate
+        context: Context object
+        save_to: Path to save image
+        w: Image width
+        h: Image height
+        steps: Number of inference steps
+        cfg: Guidance scale
+
+    Returns:
+        Path to saved image or None if generation fails
+    """
+    try:
+        if not context or 'model' not in context.data:
+            print("Error: No model selected in context")
+            return None
+            
+        model = context.data['model']
         endpoint_id = model['endpoint_id']
         
-        input = {
+        input_params = {
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "num_inference_steps": steps,
@@ -86,61 +125,63 @@ async def text_to_image(prompt, negative_prompt='', model_id=None, from_huggingf
             "seed": None,
             "num_images": 1
         }
-        # anything defined under model['defaults'] is applied to input
+
+        # Apply model defaults if available
         if 'defaults' in model:
-            # convert property names: steps -> num_inference_steps, cfg->guidance_scale
-            if 'steps' in model['defaults']:
-                input['num_inference_steps'] = model['defaults']['steps']
-            if 'cfg' in model['defaults']:
-                input['guidance_scale'] = model['defaults']['cfg']
+            defaults = model['defaults']
+            mapping = {
+                'steps': 'num_inference_steps',
+                'cfg': 'guidance_scale',
+                'seed': 'seed',
+                'prompt': 'prompt',
+                'negative_prompt': 'negative_prompt',
+                'width': 'width',
+                'height': 'height'
+            }
+            
+            for model_key, input_key in mapping.items():
+                if model_key in defaults:
+                    if model_key in ['prompt', 'negative_prompt']:
+                        input_params[input_key] += ',' + defaults[model_key]
+                    else:
+                        input_params[input_key] = defaults[model_key]
 
-            if 'seed' in model['defaults']:
-                input['seed'] = model['defaults']['seed']
-            if 'prompt' in model['defaults']:
-                input['prompt'] += ',' + model['defaults']['prompt']
-            if 'negative_prompt' in model['defaults']:
-                input['negative_prompt'] += ',' + model['defaults']['negative_prompt']
-            if 'width' in model['defaults']:
-                input['width'] = model['defaults']['width']
-            if 'height' in model['defaults']:
-                input['height'] = model['defaults']['height']
+        for n in range(count):
+            print(f"Generating image {n+1}/{count}")
+            image = await send_job(input_params, endpoint_id)
+            
+            if image:
+                fname = save_to or os.path.join("imgs", random_img_fname())
+                os.makedirs(os.path.dirname(fname), exist_ok=True)
+                image.save(fname)
+                return fname
+            
+        return None
 
-        for n in range(1, count+1):
-            print(input)
-            image = await send_job(input, endpoint_id)
-            fname = "imgs/"+random_img_fname()
-            image.save(fname)
-            return fname
     except Exception as e:
-        print("Error in text_to_image", e)
+        print(f"Error in text_to_image: {str(e)}")
         return None
 
 @command()
-async def image(description="", context=None):
-    """image: Generate an image from a prompt
+async def image(description: str = "", context: Optional[Any] = None) -> None:
+    """Generate an image from a text description
 
-    # Example:
+    Args:
+        description: Text description of desired image
+        context: Context object
 
-    [
-      { "image": {"description": "A cute tabby cat in the forest"} },
-      { "image": {"description": "A happy golden retriever in the park"} }
-    ]
-
-    # Example:
-
-    [
-      { "image": {"description": "A christmas gift wrapped in a red bow."} }
-    ]
-
+    Example:
+        [
+          { "image": {"description": "A cute tabby cat in the forest"} },
+          { "image": {"description": "A happy golden retriever in the park"} }
+        ]
     """
-    prompt = description
-    print(prompt)
-    fname = await context.text_to_image(prompt)
-    print("image output to file", fname)
-    print("context = ", context)
-    await context.insert_image(fname)
-
-if __name__ == "__main__":
-    print("Testing image generation")
-    asyncio.run(text_to_image("A cute tabby cat in the forest", count=1))
-    print("Done testing image generation")
+    try:
+        fname = await context.text_to_image(description)
+        if fname:
+            print(f"Image saved to: {fname}")
+            await context.insert_image(fname)
+        else:
+            print("Failed to generate image")
+    except Exception as e:
+        print(f"Error in image command: {str(e)}")

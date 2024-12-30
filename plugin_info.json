@@ -2,5 +2,6 @@
   "name": "RunPod SD",
   "version": "1.0.0",
   "description": "Stable Diffusion via RunPod serverless",
-  "services": []
+  "services": ["text_to_image", "select_image_model"],
+  "commands": ["image"]
 }
