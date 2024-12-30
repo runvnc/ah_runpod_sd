@@ -10,6 +10,7 @@ from lib.providers.commands import command
 from PIL import Image
 import base64
 import io
+import traceback
 
 runpod.api_key = os.getenv("RUNPOD_API_KEY")
 
@@ -120,7 +121,6 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
         if not context or 'model' not in context.data:
             print("Error: No model selected in context")
             model = await default_image_model(context)
-            return None
             
         model = context.data['model']
         endpoint_id = model['endpoint_id']
@@ -171,7 +171,8 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
         return None
 
     except Exception as e:
-        print(f"Error in text_to_image: {str(e)}")
+        trace = traceback.format_exc()
+        print(f"Error in text_to_image: {str(e)} \n {trace}"
         return None
 
 @command()
