@@ -12,6 +12,7 @@ import base64
 import io
 import traceback
 
+
 runpod.api_key = os.getenv("RUNPOD_API_KEY")
 
 def random_img_fname() -> str:
@@ -84,7 +85,7 @@ async def select_image_model(context: Optional[Any] = None, model_id: Optional[s
 
 async def default_image_model(context):
     return {
-        'endpoint_id':  os.env.get("RUNPOD_SD_ENDPOINT_ID"),
+        'endpoint_id':  os.getenv("RUNPOD_SD_ENDPOINT_ID"),
         'defaults': {
             'steps': 25,
             'cfg': 8.0,
