@@ -157,6 +157,8 @@ async def text_to_image(prompt: str, negative_prompt: str = '', model_id: Option
                     else:
                         input_params[input_key] = defaults[model_key]
 
+        print("Input params:", input_params)
+
         for n in range(count):
             print(f"Generating image {n+1}/{count}")
             image = await send_job(input_params, endpoint_id)
