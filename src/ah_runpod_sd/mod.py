@@ -197,3 +197,36 @@ async def image(description: str = "", context: Optional[Any] = None) -> None:
             print("Failed to generate image")
     except Exception as e:
         print(f"Error in image command: {str(e)}")
+
+
+@command()
+async def image_ex(description: str = "", negative: str = "", steps: int = 20, 
+                cfg: float = 8.0, w: int = 1024, h: int = 1024, 
+                context: Optional[Any] = None) -> None:
+    """Generate an image from a text description and additional parameters
+
+    Args:
+        description: Text description of desired image
+        negative: Things to avoid in the image
+        steps: Number of inference steps (default 20)
+        cfg: Guidance scale (default 8.0)
+        w: Image width (default 1024)
+        h: Image height (default 1024)
+        context: Context object
+
+    Example:
+        [
+          { "image": {"description": "A cute tabby cat in the forest", "negative": "scary" } },
+          { "image": {"description": "A happy golden retriever in the park"} }
+        ]
+    """
+    try:
+        fname = await context.text_to_image(description, negative, steps=steps, cfg=cfg, w=w, h=h)
+        if fname:
+            print(f"Image saved to: {fname}")
+            await context.insert_image(fname)
+        else:
+            print("Failed to generate image")
+    except Exception as e:
+        print(f"Error in image command: {str(e)}")
+
