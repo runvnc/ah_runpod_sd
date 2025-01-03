@@ -225,7 +225,7 @@ async def image_ex(description: str = "", negative: str = "", steps: int = 20,
         if fname:
             print(f"Image saved to: {fname}")
             fname_only = fname[fname.rindex('/')+1:]
-            rel_url = "/imgs" + fname_only
+            rel_url = "/imgs/" + fname_only
             print("rel_url", rel_url)
             await context.insert_image(rel_url)
             return f"Image generated at {rel_url} and inserted into chat UI"
